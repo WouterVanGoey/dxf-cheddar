@@ -1,13 +1,13 @@
 from __future__ import annotations
-from pathlib import Path
-import ezdxf
-from ezdxf.render.forms import box, translate
-from ezdxf import disassemble
-from ezdxf.render import path
-from typing import NamedTuple, Optional, List
 
 import math
+from pathlib import Path
+from typing import List
 
+import ezdxf
+from ezdxf import disassemble
+from ezdxf.render import path
+from ezdxf.render.forms import box, translate
 
 DIR = Path(".")
 
@@ -15,16 +15,36 @@ DIR = Path(".")
 class L_frame:
     def __init__(
         self,
-        width: int,
-        horizontal_length: int,
-        vertical_length: int,
-        angle: int,
-        thickness: int = 1,
+        width: float,
+        horizontal_length: float,
+        vertical_length: float,
+        angle: float,
+        thickness: float = 1.0,
     ) -> None:
         self.width = width
         self.horizontal_length = horizontal_length
         self.vertical_length = vertical_length
         self.angle = angle
+        self.thickness = thickness
+
+
+class U_frame:
+    def __init__(
+        self,
+        width: float,
+        horizontal_length: float,
+        vertical_length_left: float,
+        vertical_length_right: float,
+        angle_left: float,
+        angle_right: float,
+        thickness: float = 1.0,
+    ) -> None:
+        self.width = width
+        self.horizontal_length = horizontal_length
+        self.vertical_length_left = vertical_length_left
+        self.vertical_length_right = vertical_length_right
+        self.angle_left = angle_left
+        self.angle_right = angle_right
         self.thickness = thickness
 
 
@@ -35,49 +55,60 @@ class Hole:
 
 
 class Circle(Hole):
-    def __init__(self, radius: int) -> None:
+    def __init__(self, radius: float) -> None:
         self.radius = radius
         self.height = self.radius * 2
         self.width = self.radius * 2
 
 
 class Slot(Hole):
-    def __init__(self, radius: int, length: int, angle: int) -> None:
+    def __init__(self, radius: float, length: float, angle: float) -> None:
         self.radius = radius
         self.length = length  # distance beteen end radii
         self.angle = angle
-        # TODO not completely correct
-        self.height = (self.length + (2 * self.radius)) * math.sin(self.angle)
-        self.width = (self.length + (2 * self.radius)) * math.cos(self.angle)
+        self.height = (self.length * math.sin(self.angle)) + (2 * self.radius)
+        self.width = (self.length * math.cos(self.angle)) + (2 * self.radius)
 
 
 class Rectangle:
     def __init__(
         self,
-        width: int,
-        height: int,
-        offset_from_side: int = 0,
-        offset_from_bottom: int = 0,
-        thickness: int = 1,
+        width: float,
+        height: float,
+        offset_from_side: float = 0,
+        offset_from_bottom: float = 0,
+        thickness: float = 1,
     ) -> None:
         self.width = width
         self.height = height
         self.thickness = thickness
-        self.offset_from_side = offset_from_side
+        self.offset_from_side = offset_from_side # offset until edge of hole, not center
         self.offset_from_bottom = offset_from_bottom
 
         self.holes: List[Hole] = []
         self.holes_total_width: float = 0.0
 
     @staticmethod
-    def from_L_frame(l_frame) -> Rectangle:
+    def from_L_frame(l_frame: L_frame) -> Rectangle:
         # replace with formula used in Excel
         height = (
             l_frame.horizontal_length
             + l_frame.vertical_length
-            - (1 if l_frame == 90 else 0.5)
+            - (1 if l_frame.angle == 90 else 0.5)
         )
         return Rectangle(l_frame.width, height, l_frame.thickness)
+
+    @staticmethod
+    def from_U_frame(u_frame: U_frame) -> Rectangle:
+        # replace with formula used in Excel
+        height = (
+            u_frame.horizontal_length
+            + u_frame.vertical_length_left
+            + u_frame.vertical_length_right
+            - (1 if u_frame.angle_left == 90 else 0.5)
+            - (1 if u_frame.angle_right == 90 else 0.5)
+        )
+        return Rectangle(u_frame.width, height, u_frame.thickness)
 
     def add_holes(self, holes: List[Hole]) -> None:
         for hole in holes:
@@ -101,7 +132,7 @@ class DXF:
         self.attribs = {"layer": "FORMS"}
 
     def add_rectangle(
-        self, rectangle: Rectangle, start_from_x: int = 0, start_from_y: int = 0
+        self, rectangle: Rectangle, start_from_x: float = 0.0, start_from_y: float = 0.0
     ) -> None:
         # Rectangle with evenly spaced holes
         rect_coordinates = translate(
@@ -168,6 +199,7 @@ class DXF:
 
 
 if __name__ == "__main__":
+    """
     dxf = DXF()
 
     l_frame = L_frame(width=200, horizontal_length=50, vertical_length=10, angle=90)
@@ -187,6 +219,7 @@ if __name__ == "__main__":
             Slot(radius=5, length=10, angle=45),
         ]
     )
-    dxf.add_rectangle(rectangle_2, start_from_x=0, start_from_y=rectangle_2.height + 20)
+    dxf.add_rectangle(rectangle_2, start_from_x=0, start_from_y=rectangle_1.height + 20.0)
 
     dxf.save("demo")
+    """
