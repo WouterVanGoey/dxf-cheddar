@@ -1,3 +1,4 @@
+# BetterCode v0.1
 from __future__ import annotations
 
 import math
@@ -9,8 +10,218 @@ from ezdxf import disassemble
 from ezdxf.render import path
 from ezdxf.render.forms import box, translate
 
-DIR = Path(".")
+# UI stuff
+import tkinter as tk
+import tkinter.font as tkFont
 
+DIR = Path(".")
+NAME = "better_rect"
+
+window = tk.Tk()
+window.geometry('280x280')
+window.title("Easy DXF")
+
+font_small = tkFont.Font(family="Arial",size=12,weight="normal", underline = 0)
+font_medium = tkFont.Font(family="Arial",size=16,weight="normal", underline = 0)
+font_large = tkFont.Font(family="Arial bold",size=17,weight="bold", underline = 0)
+
+lbl = tk.Label(window, text=" Easy DXF Generator ", font=font_large)
+lbl.pack(side=tk.TOP, pady = 5)
+
+frame_rectangle = tk.Frame(master=window, relief="flat", borderwidth=1)
+frame_rectangle.pack(side=tk.TOP, padx = 10)
+
+frame_holes = tk.Frame(master=window, relief="flat", borderwidth=1)
+frame_holes.pack(side=tk.TOP, padx = 10, pady= 8)
+
+frame_result = tk.Frame(master=window, relief="ridge", borderwidth=4)
+frame_result.pack(side=tk.TOP, expand=tk.YES, fill = tk.BOTH, padx = 10)
+
+frame_quantity = tk.Frame(master=frame_result, relief="flat", borderwidth=1)
+frame_quantity.pack(side=tk.TOP, expand=tk.YES, fill = tk.BOTH, padx = 5)
+
+frame_spacing = tk.Frame(master=frame_result, relief="flat", borderwidth=1)
+frame_spacing.pack(side=tk.TOP, expand=tk.YES, fill = tk.BOTH, padx = 5)
+
+frame_buttons = tk.Frame(master=window, relief="flat", borderwidth=1)
+frame_buttons.pack(side=tk.BOTTOM, expand=tk.YES, fill = tk.BOTH, padx = 5)
+
+# Create input labels
+
+length_lbl = tk.Label(frame_rectangle, text="length_lbl", font=font_small)
+padding_lbl = tk.Label(frame_rectangle)
+height_lbl = tk.Label(frame_rectangle, text="height_lbl", font=font_small)
+
+length_lbl.grid(column=0, row=0, padx = 5)
+padding_lbl.grid(column=2, row=0, padx = 2)
+height_lbl.grid(column=3, row=0, padx = 5)
+
+diameter_lbl = tk.Label(frame_holes, text="Hole Ø", font=font_small)
+offset_x_lbl = tk.Label(frame_holes, text=" Offset X", font=font_small)
+offset_y_lbl = tk.Label(frame_holes, text=" Offset Y", font=font_small)
+max_spacing_lbl = tk.Label(frame_holes, text=" Max ⬌", font=font_small)
+
+diameter_lbl.grid(column=0, row=0, padx = 4)
+offset_x_lbl.grid(column=1, row=0, padx = 4)
+max_spacing_lbl.grid(column=2, row=0, padx = 4)
+offset_y_lbl.grid(column=3, row=0, padx = 4)
+
+# Create input fields
+
+inputFieldWidth = 8
+
+length_val = tk.Entry(frame_rectangle,width=inputFieldWidth, justify='center')
+height_val = tk.Entry(frame_rectangle,width=inputFieldWidth, justify='center')
+
+length_val.grid(column=1, row=0, padx = 5)
+height_val.grid(column=4, row=0, padx = 5)
+
+diameter_val = tk.Entry(frame_holes,width=inputFieldWidth, justify='center')
+offset_x_val = tk.Entry(frame_holes,width=inputFieldWidth, justify='center')
+max_spacing_val = tk.Entry(frame_holes,width=inputFieldWidth, justify='center')
+offset_y_val = tk.Entry(frame_holes,width=inputFieldWidth, justify='center')
+
+diameter_val.grid(column=0, row=1)
+offset_x_val.grid(column=1, row=1)
+max_spacing_val.grid(column=2, row=1)
+offset_y_val.grid(column=3, row=1)
+
+# Create result labels
+
+quantity_lbl = tk.Label(frame_quantity, font=font_medium)
+quantity_lbl.pack(side = tk.LEFT, padx = 5)
+quantity_lbl.configure(text= "quantity_lbl:")
+
+quantity_val = tk.Label(frame_quantity, font=font_medium)
+quantity_val.pack(side = tk.RIGHT, padx = 5)
+
+spacing_lbl = tk.Label(frame_spacing, font=font_medium)
+spacing_lbl.pack(side = tk.LEFT, padx = 5)
+spacing_lbl.configure(text= "spacing_lbl:")
+
+spacing_val = tk.Label(frame_spacing, font=font_medium)
+spacing_val.pack(side = tk.RIGHT, padx = 5)
+
+# Default values
+
+length_val_def = 1000.0
+height_val_def = 400.0
+
+length_val.insert(0, length_val_def)
+height_val.insert(0, height_val_def)
+
+diameter_val_def = 5.0
+offset_x_val_def = 7.0
+offset_y_val_def = 7.0
+max_spacing_val_def = 2.0
+
+diameter_val.insert(0, diameter_val_def)
+offset_x_val.insert(0, offset_x_val_def)
+offset_y_val.insert(0, offset_y_val_def)
+max_spacing_val.insert(0, max_spacing_val_def)
+
+btn_1 = tk.Button(frame_buttons, text="add holes", font=font_large, fg = "black", bg="light grey", command=addHoles)
+btn_2 = tk.Button(frame_buttons, text="make dxf", font=font_large, fg = "black", bg= "light grey", command=generateDxf)
+btn_1.pack(side=tk.LEFT, expand=tk.YES, fill = tk.BOTH, padx = 5, pady=10)
+btn_2.pack(side=tk.RIGHT, expand=tk.YES, fill = tk.BOTH, ipadx= 5, padx = 5, pady=10)
+
+# backend stuff
+
+def get(val): # Get values
+    
+    val_to_get = val + '_val'
+    if val_to_get.get(): return val_to_get.get()
+
+def calculate(val):  # Calulate values
+
+    variables = ['length', 'height', 'diameter', 'offset_x', 'offset_y', 'max_spacing']
+    
+    max_spacing = get(max_spacing)
+    length = get(length)
+    height = get(height)
+    diameter = get(diameter)
+    offset_x = get(offset_x)
+    offset_y = get(offset_y)
+
+    if val == radius:
+
+            radius = diameter / 2
+            return radius
+
+    elif  val == distance:
+            
+            distance = length - 2 * offsetX
+
+    elif  val == quantity:
+
+        if max_spacing > 2 and  distance > 0:
+            quantity = max(2, (math.ceil(distance/max_spacing) + 1))
+
+        elif max_spacing == 0: 
+            quantity = 0
+
+        elif max_spacing == 1:
+            quantity = 1
+
+        elif max_spacing == 2:
+            quantity = 2
+
+        else:
+            quantity = 0
+
+    elif  val == spacing:
+
+        if max_spacing > 2:
+            spacing = round(distance / (quantity -1), 4)
+
+        elif max_spacing == 0:
+            spacing = 0.0
+
+        elif max_spacing == 1:
+            spacing = 0.0
+
+        elif max_spacing == 2:
+            spacing = distance
+
+        else:
+            spacing = 0.0      
+
+def results(quantity, spacing):
+
+    spacing_stripped = str(spacing)
+    spacing_stripped = spacing_stripped.strip("0")
+    spacing_stripped = spacing_stripped.strip(".")
+
+    quantity_val.configure(text= str(quantity))
+    spacing_val.configure(text= spacing_stripped)
+
+def update():
+    calculate()
+    window.after(50, update)
+
+def drawRect(X,Y):
+    box(X,Y)
+
+def addHoles(center, quantity, spacing):
+    
+def generateDxf(): #Gererate DXF with rectangle and holes
+    calculate()
+
+    # with r12writer("rect.dxf") as dxf:
+
+    #     X = length
+    #     Y = height
+
+    #     H1 = [offsetX,offsetY]  # Coordinates of hole center
+
+    #     dxf.add_polyface(vertices=[(0,0,0),(X,0,0),(X,Y,0),(0,Y,0)], faces=[(0, 1, 2, 3)])
+        
+    #     if max_spacing != 0:
+    #         for i in range(quantity):
+    #             n = int(i)
+    #             dxf.add_circle((H1[0] + n*spacing, H1[1]), radius = radius)
+
+"""
 
 class L_frame:
     def __init__(
@@ -197,9 +408,7 @@ class DXF:
         self.doc.set_modelspace_vport(15, (4, 4))
         self.doc.saveas(DIR / f"{filename}.dxf")
 
-
 if __name__ == "__main__":
-    """
     dxf = DXF()
 
     l_frame = L_frame(width=200, horizontal_length=50, vertical_length=10, angle=90)
@@ -209,9 +418,7 @@ if __name__ == "__main__":
     rectangle_1.add_holes([Circle(radius=5) for _ in range(7)])
     dxf.add_rectangle(rectangle_1)
 
-    rectangle_2 = Rectangle(
-        width=150, height=50, offset_from_side=40, offset_from_bottom=5
-    )
+    rectangle_2 = Rectangle(width=150, height=50, offset_from_side=40, offset_from_bottom=5)
     rectangle_2.add_holes(
         [
             Slot(radius=5, length=10, angle=45),
@@ -221,5 +428,8 @@ if __name__ == "__main__":
     )
     dxf.add_rectangle(rectangle_2, start_from_x=0, start_from_y=rectangle_1.height + 20.0)
 
-    dxf.save("demo")
-    """
+    dxf.save(NAME)
+
+"""
+update()
+window.mainloop()
